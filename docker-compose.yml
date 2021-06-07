@@ -1,0 +1,68 @@
+services:
+  catch-all:
+    image: nginx:1.21-alpine
+    volumes:
+      - ./nginx/catch-all.conf:/etc/nginx/nginx.conf:ro
+      - ./www-catch-all:/usr/share/nginx/html:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.catch-all-service.loadbalancer.server.port=80"
+      # Use as "fallback" for any unknown URL (with lowest possible priority).
+      - "traefik.http.routers.catch-all-router.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.catch-all-router.priority=1"
+      - "traefik.http.routers.catch-all-router.entryPoints=web"
+      - "traefik.http.routers.catch-all-router.middlewares=catch-all-middleware@docker"
+      # Configure the error middleware for specific status codes.
+      - "traefik.http.middlewares.catch-all-middleware.errors.status=404"
+      - "traefik.http.middlewares.catch-all-middleware.errors.service=catch-all-service"
+      - "traefik.http.middlewares.catch-all-middleware.errors.query=/"
+
+  status-pages:
+    image: nginx:1.21-alpine
+    volumes:
+      - ./nginx/status-pages.conf:/etc/nginx/nginx.conf:ro
+      - ./www-status-pages:/usr/share/nginx/html:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.status-pages-service.loadbalancer.server.port=80"
+      - "traefik.http.routers.status-pages-router.rule=Host(`error.localhost`)"
+      - "traefik.http.routers.status-pages-router.entryPoints=web"
+      - "traefik.http.routers.status-pages-router.middlewares=status-pages-middleware@docker"
+      # Configure the error middleware for specific status codes.
+      - "traefik.http.middlewares.status-pages-middleware.errors.status=400,401,403-405,407-413,416,418,429,500,502-505"
+      - "traefik.http.middlewares.status-pages-middleware.errors.service=status-pages-service"
+      - "traefik.http.middlewares.status-pages-middleware.errors.query=/{status}.html"
+
+  sandbox:
+    image: kennethreitz/httpbin:latest
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.sandbox-service.loadbalancer.server.port=80"
+      - "traefik.http.routers.sandbox-router.rule=Host(`test.localhost`)"
+      - "traefik.http.routers.sandbox-router.entryPoints=web"
+      - "traefik.http.routers.sandbox-router.middlewares=status-pages-middleware@docker"
+
+  traefik:
+    image: traefik:2.4
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - target: 80
+        published: 80
+        mode: host
+    command:
+      - --accessLog=true
+      - --api=true
+      - --log.level=DEBUG
+      - --entrypoints.web.address=:80
+      - --providers.docker=true
+      - --providers.docker.exposedByDefault=false
+      - --providers.docker.network=default
+    labels:
+      - "traefik.enable=true"
+      # Enable the Traefik dashboard.
+      - "traefik.http.services.traefik-service.loadBalancer.server.port=8080"
+      - "traefik.http.routers.traefik-router.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.traefik-router.entryPoints=web"
+      - "traefik.http.routers.traefik-router.service=api@internal"
