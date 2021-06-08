@@ -1,19 +1,17 @@
----
-title: Traefik Error Pages
----
+# Traefik Error Pages
 
 ![The blue screen of death on Windows.](images/bsod.png)
 
-# Summary
+## Summary
 
 **This blog post explains in detail how to set up two traefik services and errors middleware in order to show your users a custom `404 Not Found` page on any URL unknown to traefik, as well as custom pages for any status codes that you desire on your other services.**
 
-# Prerequisites
+## Prerequisites
 
 - This post assumes some familiarity with configuring [traefik](https://doc.traefik.io/).
 - In order to try the examples, you will need to have installed [Docker Engine](https://docs.docker.com/engine/install/) and [Docker Compose](https://docs.docker.com/compose/install/).
 
-# Intro
+## Intro
 
 At my startup [Unseen Bio](https://unseenbio.com), we recently had a need to display a more friendly page to our customers in the rare occasion that one of our services is down. We use the very enjoyable [traefik reverse proxy and load balancer](https://traefik.io/traefik/) so I took a look at the [documentation for the errors middleware](https://doc.traefik.io/traefik/middlewares/errorpages/). That gave me a good idea of what had to be done but there's nothing better than a working example, right? After a brief search I landed on three pages that got me most of the way: a [post by Andrea Mignone](https://imandrea.me/blog/traefik-custom-404/), [another by Nicholas Dille](https://dille.name/blog/2021/03/14/using-traefik-error-pages-to-handle-unavailable-services/), and a [Docker image with custom error pages with a ready-made traefik configuration](https://github.com/tarampampam/error-pages#custom-error-pages-for-traefik).
 
@@ -25,13 +23,13 @@ labels:
 - "traefik.http.routers.catch-all-router.priority=1"
 ```
 
-# Problem
+## Problem
 
 The problem for us? This _catch-all_ service displays our custom page nicely but since traefik can successfully route the request, the response status is naturally `200 OK`. That means, our availability monitoring wasn't reporting outages and it triggered our engineering [OCD](https://en.wikipedia.org/wiki/Obsessive%E2%80%93compulsive_disorder).
 
 > We needed a catch-all service that always returns `404 Not Found`.
 
-# Solution
+## Solution
 
 Before describing relevant parts of the configuration, I will outline the behavior of the full Docker stack [defined in the repository](https://github.com/Midnighter/errorpages-demo) accompanying this post.
 
@@ -52,7 +50,7 @@ Traefik is configured to listen on port 80 (the default for [HTTP](https://en.wi
 
 ![A table of the treafik HTTP routes as displayed in the dashboard.](images/dashboard.png)
 
-## Catch-All Service
+### Catch-All Service
 
 If instead you visit [localhost](http://localhost/), only the catch-all service's rule will handle that and you will be greeted by a cute custom response.
 
@@ -84,7 +82,7 @@ server {
 
 The trick is that we define an nginx error page for status 404 (located at `/usr/share/nginx/html/404.html`) and define it as `internal`. That means it is only visible to nginx itself. We then define a second location that matches any path and always returns status 404 thus always responding with the custom error page and status 404\. With this configuration we get the custom page as well as the status 404 which allows our monitoring to alert us about missing services. Success!
 
-## Error Pages on Services
+### Error Pages on Services
 
 For completeness, I will also show you how to configure traefik middleware in order to replace responses of a specific service with custom pages. This is useful either if it is cumbersome to customize that service's responses or if you want to configure the same customized responses on multiple services.
 
@@ -112,7 +110,7 @@ From then on, any response status from the httpbin service that is among the lis
 
 Compare this to [test.localhost/status/406](http://test.localhost/status/406) which is not handled by the middleware.
 
-# Resources
+## Resources
 
 - [Demo repository for this post](https://github.com/Midnighter/errorpages-demo)
 - [Traefik error pages documentation](https://doc.traefik.io/traefik/middlewares/errorpages/)
@@ -123,7 +121,7 @@ Compare this to [test.localhost/status/406](http://test.localhost/status/406) wh
 
 - [Docker image with custom error pages](https://github.com/tarampampam/error-pages)
 
-# Copyright
+## Copyright
 
 - The code is copyright © 2021, Moritz E. Beber and shared under the permissive [Apache Software License 2.0](LICENSE).
 - The post itself is made available under the [Creative Commons Attribution 4.0 International License](http://creativecommons.org/licenses/by/4.0/) [![Creative Commons License](https://i.creativecommons.org/l/by/4.0/88x31.png)](http://creativecommons.org/licenses/by/4.0/)
